@@ -30,7 +30,7 @@ object AiRestoreEngine {
     ) {
         val mainHandler = Handler(Looper.getMainLooper())
 
-        // 🧹 कोणत्याही लपलेल्या Enter (\n, 0x0a) किंवा स्पेसला आपोआप स्वच्छ करणे
+        // 🧹 टोकनमधील सर्व न्यूलाईन आणि स्पेस स्वच्छ करणे
         val token = apiToken.filter { it.isLetterOrDigit() || it == '_' }
 
         if (token.isBlank() || !token.startsWith("r8_")) {
@@ -43,7 +43,7 @@ object AiRestoreEngine {
 
         Thread {
             try {
-                // १. फोटोचा आकार सेफ ठेवून Base64 Data URI बनवणे
+                // १. फोटोचे रिझोल्यूशन Base64 Data URI मध्ये तयार करणे
                 val stream = ByteArrayOutputStream()
                 val maxDim = maxOf(inputBitmap.width, inputBitmap.height)
                 val scale = if (maxDim > 1024) 1024f / maxDim else 1f
@@ -55,15 +55,13 @@ object AiRestoreEngine {
                 val base64Image = Base64.encodeToString(stream.toByteArray(), Base64.NO_WRAP)
                 val dataUri = "data:image/jpeg;base64,$base64Image"
 
-                // २. Replicate अधिकृत CodeFormer मॉडेल विनंती
+                // २. 🏭 Real-ESRGAN 4x: क्रेन डिस्प्ले, आकडे, अक्षरे आणि चेहरे सर्वांसाठी परिपूर्ण
                 val jsonBody = JSONObject().apply {
-                    put("version", "7de2ea26c616d5bf2245ad0d5e24f0ff9a6204578a5c876db53142edd9d2cd56")
+                    put("version", "42fed1c4974146d4d2414e2be2c5277c7fcf05fcc3a73abf41610695738c1d7b")
                     put("input", JSONObject().apply {
                         put("image", dataUri)
-                        put("upscale", 2)
-                        put("face_upsample", true)
-                        put("background_enhance", true)
-                        put("codeformer_fidelity", 0.7)
+                        put("scale", 4)             // ४ पट सुपर-रिझोल्यूशन (अक्षरे स्पष्ट करण्यासाठी)
+                        put("face_enhance", true)    // चेहरा असल्यास चेहराही रिस्टोअर करेल
                     })
                 }
 
@@ -76,7 +74,7 @@ object AiRestoreEngine {
                     .build()
 
                 mainHandler.post {
-                    Toast.makeText(context, "⚡ AI जादू सुरू झाली... काही सेकंद थांबा", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, "⚡ 4K सुपर-रिझोल्यूशन सुरू झाले... ५ सेकंद थांबा", Toast.LENGTH_SHORT).show()
                 }
 
                 val response = client.newCall(request).execute()
@@ -108,7 +106,7 @@ object AiRestoreEngine {
 
                     if (pollUrl != null) {
                         var attempts = 0
-                        while (status != "succeeded" && status != "failed" && attempts < 35) {
+                        while (status != "succeeded" && status != "failed" && attempts < 40) {
                             Thread.sleep(1500)
                             attempts++
 
@@ -130,7 +128,7 @@ object AiRestoreEngine {
                     }
                 }
 
-                // ३. तयार झालेला 4K फोटो डाऊनलोड करणे
+                // ३. तयार झालेला ४ पट मोठा, शार्प फोटो डाऊनलोड करणे
                 if (!outputImageUrl.isNullOrBlank()) {
                     val downloadReq = Request.Builder().url(outputImageUrl).get().build()
                     val downloadResp = client.newCall(downloadReq).execute()
@@ -139,7 +137,7 @@ object AiRestoreEngine {
                     if (imageBytes != null) {
                         val restoredBmp = BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size)
                         mainHandler.post {
-                            Toast.makeText(context, "🎉 AI 4K Restore यशस्वी!", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, "🎉 4K Super-Resolution यशस्वी!", Toast.LENGTH_SHORT).show()
                             onResult(restoredBmp)
                         }
                         return@Thread
@@ -147,7 +145,7 @@ object AiRestoreEngine {
                 }
 
                 mainHandler.post {
-                    Toast.makeText(context, "AI प्रक्रिया पूर्ण होऊ शकली नाही", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, "प्रक्रिया पूर्ण होऊ शकली नाही", Toast.LENGTH_SHORT).show()
                     onResult(null)
                 }
 
