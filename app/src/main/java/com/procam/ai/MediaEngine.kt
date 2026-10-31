@@ -126,7 +126,89 @@ fun exportCinematicVideoWithTransformer(
 }
 
 // -------------------------------------------------------------
-// २. 🎬 ९-इन-१ MASTER CINEMATIC LOOK (Smart Letterbox + Balanced Colors)
+// २. 💧 अस्सल DSLR Lens Blur + Specular Bokeh Balls इंजिन
+// -------------------------------------------------------------
+fun applyDSLRBokehEffect(src: Bitmap, blurRadius: Float): Bitmap {
+    val w = src.width
+    val h = src.height
+
+    // १. मखमली ऑप्टिकल ब्लर (Creamy Bokeh Layer)
+    val downFactor = (14f * blurRadius).toInt().coerceIn(6, 16)
+    val small = Bitmap.createScaledBitmap(src, (w / downFactor).coerceAtLeast(1), (h / downFactor).coerceAtLeast(1), true)
+    val blurredBg = Bitmap.createScaledBitmap(small, w, h, true)
+
+    val result = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(result)
+    canvas.drawBitmap(blurredBg, 0f, 0f, null)
+
+    // २. ✨ Specular Bokeh Highlight Engine (दिव्यांचे चमकणारे गोल बोकेह बॉल्स)
+    val bokehCanvas = Canvas(result)
+    val bokehPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.FILL
+    }
+    val step = (w / 35).coerceAtLeast(12)
+    val discRadius = (w * 0.028f * blurRadius).coerceIn(14f, 48f)
+
+    // बॅकग्राऊंडमधील लाईट्स ओळखून तिथे गोलाकार बोकेह डिस्क तयार करणे
+    for (y in 0 until (h * 0.60f).toInt() step step) {
+        for (x in 0 until w step step) {
+            val pixel = src.getPixel(x, y)
+            val r = (pixel shr 16) and 0xFF
+            val g = (pixel shr 8) and 0xFF
+            val b = pixel and 0xFF
+            val luma = (0.299 * r + 0.587 * g + 0.114 * b).toInt()
+
+            // जर बॅकग्राऊंडमध्ये चमकदार दिवा/लाइट असेल
+            if (luma > 180) {
+                bokehPaint.color = android.graphics.Color.argb(
+                    75,
+                    (r * 1.15f).toInt().coerceAtMost(255),
+                    (g * 1.10f).toInt().coerceAtMost(255),
+                    (b * 1.25f).toInt().coerceAtMost(255)
+                )
+                bokehCanvas.drawCircle(x.toFloat(), y.toFloat(), discRadius, bokehPaint)
+            }
+        }
+    }
+
+    // ३. 👥 Multi-Person Sharp Foreground Mask (एकापेक्षा जास्त लोक असले तरी सर्व पूर्ण शार्प!)
+    val depthMask = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+    val maskCanvas = Canvas(depthMask)
+    val depthShader = android.graphics.LinearGradient(
+        0f, h * 0.20f, // वर बॅकग्राऊंड ब्लर
+        0f, h * 0.45f, // लोकांचे चेहरे, कपडे आणि शरीर डावीकडून उजवीपर्यंत १००% शार्प
+        intArrayOf(android.graphics.Color.TRANSPARENT, android.graphics.Color.WHITE),
+        floatArrayOf(0f, 1f),
+        Shader.TileMode.CLAMP
+    )
+    val gradPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        shader = depthShader
+    }
+    maskCanvas.drawRect(0f, 0f, w.toFloat(), h.toFloat(), gradPaint)
+
+    // ४. 🌅 लोकांच्या अंगावर सिनेमॅटिक वॉर्म ग्लो (Amber/Golden Illumination)
+    val warmSubject = src.copy(Bitmap.Config.ARGB_8888, true)
+    val warmCanvas = Canvas(warmSubject)
+    val warmMatrix = ColorMatrix(floatArrayOf(
+        1.14f, 0f, 0f, 0f, 14f,  // Warm Amber Pop
+        0f, 1.05f, 0f, 0f, 6f,   // Glowing Skin Tone
+        0f, 0f, 0.94f, 0f, -4f,
+        0f, 0f, 0f, 1f, 0f
+    ))
+    warmCanvas.drawBitmap(src, 0f, 0f, Paint().apply { colorFilter = ColorMatrixColorFilter(warmMatrix); isAntiAlias = true })
+
+    // ५. शार्प व्यक्तींचा थर मखमली बॅकग्राऊंडवर अचूक ब्लेंड करणे
+    val blendPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        xfermode = PorterDuffXfermode(PorterDuff.Mode.DST_IN)
+    }
+    warmCanvas.drawBitmap(depthMask, 0f, 0f, blendPaint)
+    canvas.drawBitmap(warmSubject, 0f, 0f, Paint(Paint.ANTI_ALIAS_FLAG))
+
+    return result
+}
+
+// -------------------------------------------------------------
+// ३. ९-इन-१ MASTER CINEMATIC LOOK
 // -------------------------------------------------------------
 fun applyMasterCinematic9in1(src: Bitmap): Bitmap {
     val w = src.width
@@ -157,7 +239,7 @@ fun applyMasterCinematic9in1(src: Bitmap): Bitmap {
 }
 
 // -------------------------------------------------------------
-// ३. 🥽 नाईट व्हिजनचे २ प्रकार (Military Green + Color Night)
+// ४. 🥽 नाईट व्हिजन (Military Green + Color Night)
 // -------------------------------------------------------------
 fun applyMilitaryNightVision(src: Bitmap): Bitmap {
     val res = Bitmap.createBitmap(src.width, src.height, Bitmap.Config.ARGB_8888)
@@ -216,28 +298,6 @@ fun applyPhotographicStyle(src: Bitmap, style: String): Bitmap {
 
     canvas.drawBitmap(src, 0f, 0f, Paint().apply { colorFilter = ColorMatrixColorFilter(cm); isAntiAlias = true })
     return res
-}
-
-fun applyDSLRBokehEffect(src: Bitmap, blurRadius: Float): Bitmap {
-    val w = src.width; val h = src.height
-    val downFactor = (14f * blurRadius).toInt().coerceAtLeast(8)
-    val small = Bitmap.createScaledBitmap(src, (w / downFactor).coerceAtLeast(1), (h / downFactor).coerceAtLeast(1), true)
-    val blurredBg = Bitmap.createScaledBitmap(small, w, h, true)
-    val result = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(result)
-    canvas.drawBitmap(blurredBg, 0f, 0f, null)
-
-    val focusRadius = (w.coerceAtMost(h) * 0.38f)
-    val shader = RadialGradient(w / 2f, h / 2f, focusRadius, intArrayOf(android.graphics.Color.WHITE, android.graphics.Color.WHITE, android.graphics.Color.TRANSPARENT), floatArrayOf(0f, 0.45f, 1f), Shader.TileMode.CLAMP)
-    val maskPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { this.shader = shader; xfermode = PorterDuffXfermode(PorterDuff.Mode.DST_IN) }
-
-    val sharpSubject = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    val subjectCanvas = Canvas(sharpSubject)
-    subjectCanvas.drawBitmap(src, 0f, 0f, null)
-    subjectCanvas.drawRect(0f, 0f, w.toFloat(), h.toFloat(), maskPaint)
-
-    canvas.drawBitmap(sharpSubject, 0f, 0f, Paint(Paint.ANTI_ALIAS_FLAG))
-    return result
 }
 
 fun applyVintage70sFilter(src: Bitmap): Bitmap {
@@ -370,7 +430,6 @@ fun addBrandWatermark(src: Bitmap): Bitmap {
     return res
 }
 
-// 🔥 सुरक्षित Toast (UI Thread)
 fun saveFinalProcessedBitmap(context: Context, bitmap: Bitmap, mode: String) {
     val mainHandler = Handler(Looper.getMainLooper())
     val name = "ProCam_${mode}_${SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(System.currentTimeMillis())}"
