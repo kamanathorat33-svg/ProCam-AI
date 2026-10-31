@@ -30,7 +30,9 @@ object AiRestoreEngine {
     ) {
         val mainHandler = Handler(Looper.getMainLooper())
 
-        val token = apiToken.trim()
+        // 🧹 कोणत्याही लपलेल्या Enter (\n, 0x0a) किंवा स्पेसला आपोआप स्वच्छ करणे
+        val token = apiToken.filter { it.isLetterOrDigit() || it == '_' }
+
         if (token.isBlank() || !token.startsWith("r8_")) {
             mainHandler.post {
                 Toast.makeText(context, "कृपया योग्य Replicate API Token (r8_...) टाका!", Toast.LENGTH_LONG).show()
@@ -53,7 +55,7 @@ object AiRestoreEngine {
                 val base64Image = Base64.encodeToString(stream.toByteArray(), Base64.NO_WRAP)
                 val dataUri = "data:image/jpeg;base64,$base64Image"
 
-                // २. Replicate अधिकृत CodeFormer मॉडेल विनंती (URL आणि Version दोन्ही १००% अचूक)
+                // २. Replicate अधिकृत CodeFormer मॉडेल विनंती
                 val jsonBody = JSONObject().apply {
                     put("version", "7de2ea26c616d5bf2245ad0d5e24f0ff9a6204578a5c876db53142edd9d2cd56")
                     put("input", JSONObject().apply {
